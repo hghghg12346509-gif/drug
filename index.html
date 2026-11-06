@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Мой ИИ-друг</title>
+<style>
+  :root { --bg:#0f1220; --card:#1a1f36; --accent:#7c5cff; --text:#e8e8f0; }
+  * { box-sizing: border-box; font-family: system-ui, sans-serif; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         display:grid; grid-template-columns:320px 1fr; height:100vh; }
+  aside { background:var(--card); padding:20px; overflow:auto; }
+  main { display:flex; flex-direction:column; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  label { display:block; font-size:12px; margin:12px 0 4px; opacity:.7; }
+  input, textarea, select {
+    width:100%; padding:8px; border-radius:8px; border:1px solid #333a5c;
+    background:#12162b; color:var(--text); font-size:13px; }
+  textarea { resize:vertical; min-height:60px; }
+  button { margin-top:14px; width:100%; padding:10px; border:0; border-radius:8px;
+    background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
+  #chat { flex:1; overflow:auto; padding:20px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:75%; padding:10px 14px; border-radius:14px; line-height:1.4; white-space:pre-wrap; }
+  .me { align-self:flex-end; background:var(--accent); }
+  .friend { align-self:flex-start; background:var(--card); }
+  form { display:flex; gap:8px; padding:16px; border-top:1px solid #222a44; }
+  form input { flex:1; padding:12px; border-radius:12px; }
+  form button { width:auto; margin:0; padding:0 20px; border-radius:12px; }
+</style>
+</head>
+<body>
+<aside>
+  <h2>⚙️ Настрой друга</h2>
+  <label>Имя</label><input id="name">
+  <label>Характер</label><textarea id="personality"></textarea>
+  <label>Стиль общения</label><input id="style">
+  <label>Юмор (1–10)</label><input id="humor" type="number" min="1" max="10">
+  <label>Эмпатия (1–10)</label><input id="empathy" type="number" min="1" max="10">
+  <button onclick="saveSettings()">Сохранить</button>
+</aside>
+<main>
+  <div id="chat"></div>
+  <form onsubmit="send(event)">
+    <input id="inp" placeholder="Напиши другу..." autocomplete="off">
+    <button>➤</button>
+  </form>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+
+async function loadSettings() {
+  const s = await (await fetch('/api/settings')).json();
+  $('name').value = s.name; $('personality').value = s.personality;
+  $('style').value = s.style; $('humor').value = s.humor; $('empathy').value = s.empathy;
+}
+async function saveSettings() {
+  await fetch('/api/settings', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      name: $('name').value, personality: $('personality').value,
+      style: $('style').value, humor: +$('humor').value, empathy: +$('empathy').value
+    })});
+  alert('Настройки сохранены ✅');
+}
+async function loadHistory() {
+  const h = await (await fetch('/api/history')).json();
+  $('chat').innerHTML = '';
+  h.forEach(m => addMsg(m.role === 'user' ? 'me' : 'friend', m.content));
+}
+function addMsg(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls; d.textContent = text;
+  $('chat').appendChild(d); $('chat').scrollTop = 1e9;
+}
+async function send(e) {
+  e.preventDefault();
+  const text = $('inp').value.trim(); if (!text) return;
+  $('inp').value = ''; addMsg('me', text);
+  const res = await fetch('/api/chat', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ message: text }) });
+  const data = await res.json();
+  addMsg('friend', data.reply);
+}
+loadSettings(); loadHistory();
+</script>
+</body>
+</html>
